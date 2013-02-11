@@ -5,10 +5,25 @@ package se.fnord.jamon;
  */
 public class Verifiers {
 	/**
+	 * Thrown by verifiers.
+	 * @param msg Information about failure
+	 */
+	public static class Fail extends Exception {
+		public Fail(String msg) {
+			super(msg);
+		}
+	}
+
+	/**
 	 * A node structure verifier
 	 */
 	public interface Verifier {
-		boolean verify(Node n);
+		void verify(Node n) throws Fail;
+	}
+
+	public static void test(boolean tst, final String context) throws Fail {
+		if (!tst)
+			throw new Fail(context);
 	}
 
 	/**
@@ -19,10 +34,10 @@ public class Verifiers {
 	public static Verifier childCount(final int count) {
 		return new Verifier() {
 			@Override
-			public boolean verify(Node n) {
-				return count == n.children().size();
+			public void verify(Node n) throws Fail {
+				test(count == n.children().size(), "childCount: " + n + " != " + count);
 			}
-		};		
+		};
 	}
 
 	/**
@@ -33,13 +48,11 @@ public class Verifiers {
 	public static Verifier forEachChild(final Verifier verifier) {
 		return new Verifier() {
 			@Override
-			public boolean verify(Node n) {
+			public void verify(Node n) throws Fail {
 				for (Node c : n.children())
-					if (!verifier.verify(c))
-						return false;
-				return true;
+					verifier.verify(c);
 			}
-		};		
+		};
 	}
 
 	/**
@@ -50,12 +63,8 @@ public class Verifiers {
 	public static Verifier attachment(final Object o) {
 		return new Verifier() {
 			@Override
-			public boolean verify(Node n) {
-				if (o == n.attachment())
-					return true;
-				if (o != null && o.equals(n.attachment()))
-					return true;
-				return false;
+			public void verify(Node n) throws Fail {
+				test(o == n.attachment() || o == null || o.equals(n.attachment()), "attachment: " + o + " != " + n.attachment());
 			}
 		};
 	}
@@ -68,12 +77,8 @@ public class Verifiers {
 	public static Verifier value(final Object o) {
 		return new Verifier() {
 			@Override
-			public boolean verify(Node n) {
-				if (o == n.value())
-					return true;
-				if (o != null && o.equals(n.value()))
-					return true;
-				return false;
+			public void verify(Node n) throws Fail {
+				test(o == n.value() || o == null || o.equals(n.value()), "value: " + n.value() + " != " + o);
 			}
 		};
 	}
@@ -83,17 +88,14 @@ public class Verifiers {
 	 * @param verifiers The verifiers to use when verifying children
 	 * @return the constructed verifier
 	 */
-	public static Verifier children(final Verifier ... verifiers) {
+	public static Verifier children(final Verifier... verifiers) {
 		return new Verifier() {
 			@Override
-			public boolean verify(Node n) {
-				if (verifiers.length != n.children().size())
-					return false;
+			public void verify(Node n) throws Fail {
+				test(verifiers.length == n.children().size(), "children: " + n + " != " + verifiers.length);
 				int i = 0;
 				for (Node c : n.children())
-					if (!verifiers[i++].verify(c))
-						return false;
-				return true;
+					verifiers[i++].verify(c);
 			}
 		};
 	}
@@ -103,14 +105,12 @@ public class Verifiers {
 	 * @param verifiers The verifiers whose results should be and:ed together
 	 * @return the constructed verifier
 	 */
-	public static Verifier and(final Verifier ... verifiers) {
+	public static Verifier and(final Verifier... verifiers) {
 		return new Verifier() {
 			@Override
-			public boolean verify(Node n) {
+			public void verify(Node n) throws Fail {
 				for (Verifier v : verifiers)
-					if (!v.verify(n))
-						return false;
-				return true;
+					v.verify(n);
 			}
 		};
 	}
@@ -120,14 +120,12 @@ public class Verifiers {
 	 * @param verifiers The verifiers whose results should be or:ed together
 	 * @return the constructed verifier
 	 */
-	public static Verifier or(final Verifier ... verifiers) {
+	public static Verifier or(final Verifier... verifiers) {
 		return new Verifier() {
 			@Override
-			public boolean verify(Node n) {
+			public void verify(Node n) throws Fail {
 				for (Verifier v : verifiers)
-					if (v.verify(n))
-						return true;
-				return false;
+					v.verify(n);
 			}
 		};
 	}
@@ -135,7 +133,7 @@ public class Verifiers {
 	/**
 	 * Verifies the attachment, value and children of a node.
 	 * Equivalent to:
- 	 * <p>
+	 * <p>
 	 * <code>and(attachment(attachment), value(value), children(children))</code>
 	 * <p>
 	 * @param attachment The object to check for equality with the node attachment
@@ -143,7 +141,7 @@ public class Verifiers {
 	 * @param verifiers The verifiers to use when verifying children
 	 * @return the constructed verifier
 	 */
-	public static Verifier node(final Object attachment, final Object value, final Verifier ... children) {
+	public static Verifier node(final Object attachment, final Object value, final Verifier... children) {
 		return and(attachment(attachment), value(value), children(children));
 	}
 
